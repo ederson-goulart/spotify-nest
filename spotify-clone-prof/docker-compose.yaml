@@ -1,0 +1,19 @@
+networks:
+  spotify-network:
+    name: spotify-network
+    driver: bridge
+services:
+  spotify-clonep:
+    container_name: spotify-clonep
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: spotify-clonep:latest
+    command: ["npm", "run", "start"]
+    networks:
+      - spotify-network
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production

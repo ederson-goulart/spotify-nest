@@ -1,0 +1,31 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+
+# Next.js build output
+spotify-backoffice-front/.next/
+spotify-backoffice-front/out/
+spotify-backoffice-front/tsconfig.tsbuildinfo
+spotify-backoffice-front/generated/
+
+# NestJS build output
+spotify-backoffice-back/dist/
+spotify-backoffice-back/tsconfig.build.json
+spotify-backoffice-back/tsconfig.tsbuildinfo
+
+# Prisma generated folders
+spotify-backoffice-back/generated/
+
+# Uploads directory
+spotify-backoffice-front/public/uploads/
+
+# Env credentials
+.env
+.env*.local
+*.env
+!.env.example
+
+# OS and tools
+.DS_Store
+*.pem
+.vscode/

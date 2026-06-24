@@ -1,0 +1,26 @@
+networks:
+  spotify-network:
+    name: spotify-network
+    driver: bridge
+
+volumes:
+  spotify-dbp-volume:
+    name: spotify-dbp-volume
+
+services:
+  spotify-dbp:
+    image: postgres:17.5
+    container_name: spotify-dbp
+    env_file:
+      - ./.env
+    networks:
+      - spotify-network
+    ports:
+      - "5432:5432"
+    volumes:
+      - spotify-dbp-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

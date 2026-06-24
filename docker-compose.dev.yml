@@ -1,0 +1,130 @@
+networks:
+  spotify-network:
+    name: spotify-network
+    driver: bridge
+
+volumes:
+  spotify-dbp-volume:
+    name: spotify-dbp-volume
+  minio-data:
+    name: minio-data
+
+services:
+  spotify-dbp:
+    image: postgres:17.5
+    container_name: spotify-dbp
+    env_file:
+      - ./spotify-db-prof/.env
+    networks:
+      - spotify-network
+    ports:
+      - "5432:5432"
+    volumes:
+      - spotify-dbp-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    env_file:
+      - ./spotify-minio-prof/.env
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - spotify-network
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  minio-s3:
+    image: minio/mc:latest
+    container_name: minio-s3
+    restart: "no"
+    env_file:
+      - ./spotify-minio-prof/.env
+    networks:
+      - spotify-network
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
+        echo 'Aguardando MinIO aceitar conexoes...';
+        sleep 2;
+      done;
+      mc mb -p local/uploads || true;
+      mc anonymous set download local/uploads || true;
+      echo 'Bucket criado e publico!';
+      "
+
+  spotify-backoffice-back:
+    container_name: spotify-backoffice-back-dev
+    build:
+      context: ./spotify-backoffice-back
+      dockerfile: Dockerfile
+      target: development
+      args:
+        DATABASE_URL: "postgresql://postgres:abcd1234@spotify-dbp:5432/spotify?schema=public"
+    image: spotify-backoffice-back-dev:latest
+    command: sh -c "npm install --legacy-peer-deps && npx prisma generate && npm run start:dev"
+    networks:
+      - spotify-network
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./spotify-backoffice-back:/app
+      - /app/node_modules
+    env_file:
+      - ./spotify-backoffice-back/.env
+    depends_on:
+      spotify-dbp:
+        condition: service_healthy
+
+  spotify-backoffice-front:
+    container_name: spotify-backoffice-front-dev
+    build:
+      context: ./spotify-backoffice-front
+      dockerfile: Dockerfile
+      target: development
+    image: spotify-backoffice-front-dev:latest
+    command: sh -c "npm install --legacy-peer-deps && npm run dev"
+    networks:
+      - spotify-network
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./spotify-backoffice-front:/app
+      - /app/node_modules
+    env_file:
+      - ./spotify-backoffice-front/.env
+    depends_on:
+      - spotify-backoffice-back
+
+  spotify-clone-prof:
+    container_name: spotify-clonep-dev
+    build:
+      context: ./spotify-clone-prof
+      dockerfile: Dockerfile
+      target: build
+    image: spotify-clonep-dev:latest
+    command: ["npm", "run", "dev"]
+    networks:
+      - spotify-network
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./spotify-clone-prof:/app
+      - /app/node_modules

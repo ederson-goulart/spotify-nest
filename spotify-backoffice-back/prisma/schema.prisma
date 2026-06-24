@@ -1,0 +1,95 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Band {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  status      Status   @default(active)
+  ranking     Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  coverUrl    String?  @map("cover_url")
+
+  userId String @default(uuid()) @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, name: "UserBands")
+
+  tracks Track[] @relation("BandTracks")
+
+  @@map("bands")
+}
+
+model Track {
+  id                String   @id @default(uuid()) @db.Uuid
+  title             String
+  slug              String   @unique
+  durationInSeconds Int      @map("duration_in_seconds")
+  ranking           Int      @default(0)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  userId String @default(uuid()) @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, name: "UserTracks")
+
+  bandId String @map("band_id") @db.Uuid
+  band   Band   @relation("BandTracks", fields: [bandId], references: [id], onDelete: Cascade)
+
+  @@index([bandId])
+  @@map("tracks")
+}
+
+enum Status {
+  active
+  inactive
+}
+
+enum AnalyticsEventType {
+  PAGE_VIEW
+  CREATE_BAND
+  UPDATE_BAND
+  DELETE_BAND
+  CREATE_TRACK
+  UPDATE_TRACK
+  DELETE_TRACK
+  ERROR
+}
+
+model AnalyticsEvent {
+  id        String             @id @default(uuid()) @db.Uuid
+  type      AnalyticsEventType
+  page      String
+  action    String?
+  metadata  Json?
+  timestamp DateTime           @default(now()) @map("created_at")
+
+  userId String @default(uuid()) @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, name: "UserAnalyticsEvents")
+
+  @@index([timestamp])
+  @@index([type])
+  @@index([page])
+  @@map("analytics_events")
+}
+
+model User {
+  id                 String   @id @default(uuid()) @db.Uuid
+  email              String   @unique
+  password           String
+  twoFactorSecret    String?  @map("two_factor_secret")
+  twoFactorActivated Boolean  @default(false) @map("two_factor_activated")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  bands           Band[]           @relation("UserBands")
+  tracks          Track[]          @relation("UserTracks")
+  analyticsEvents AnalyticsEvent[] @relation("UserAnalyticsEvents")
+
+  @@map("users")
+}
